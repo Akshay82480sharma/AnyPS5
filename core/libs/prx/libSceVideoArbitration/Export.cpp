@@ -30,12 +30,10 @@ int APS5_VABI sceVideoArbitrationInitialize(const void* param) {
     const bool copied = GuestCopyIn_nid_no_patch(&size, param, sizeof(size));
     errno = savedErrno;
     if (!copied) {
-        NotImplemented_nid_no_patch(__func__);
-        return 0;
+        throw std::runtime_error("sceVideoArbitrationInitialize: unreadable parameter");
     }
     if (size != VideoArbitrationParamSize) return SCE_VIDEO_ARBITRATION_ERROR_INVALID_ARGUMENT;
-    NotImplemented_nid_no_patch(__func__);
-    return 0;
+    throw std::runtime_error("sceVideoArbitrationInitialize: arbitration kernel objects unimplemented");
 }
 
 }
