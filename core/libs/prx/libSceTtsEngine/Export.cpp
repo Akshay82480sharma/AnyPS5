@@ -13,8 +13,7 @@ constexpr int SCE_TTS_ENGINE_ERROR_NOT_INITIALIZED = static_cast<int>(0x81A10004
 extern "C" {
 
 int APS5_VABI sceTtsEngineInitialize(void) {
-    NotImplemented_nid_no_patch(__func__);
-    return 0;
+    throw std::runtime_error("sceTtsEngineInitialize: speech engine unmodelled");
 }
 
 int APS5_VABI sceTtsEngineTerminate(void) {
