@@ -38,6 +38,11 @@ void TestNullExponent() {
     Require(_Pow_nid_postfix(2.0, 10.0, nullptr) == 1024.0, "_Pow 2 10");
     Require(_FPow_nid_postfix(3.0f, 2.0f, nullptr) == 9.0f, "_FPow 3 2");
     Require(_LPow_nid_postfix(2.0L, -2.0L, nullptr) == 0.25L, "_LPow 2 -2");
+    short exponent = 42;
+    Require(_Pow_nid_postfix(2.0, 10.0, &exponent) == 1024.0, "_Pow with non-null exponent");
+    Require(_FPow_nid_postfix(3.0f, 2.0f, &exponent) == 9.0f, "_FPow with non-null exponent");
+    Require(_LPow_nid_postfix(7.0L, 1.0L, &exponent) == 7.0L, "_LPow with non-null exponent and y=1");
+    Require(exponent == 42, "exponent pointer is not written");
 }
 
 }
