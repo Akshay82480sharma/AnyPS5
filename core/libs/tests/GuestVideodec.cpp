@@ -416,6 +416,15 @@ void testMapMemory() {
             check(sceVideodecMapMemory(&ctrl, memory) == ErrorApiFail, "map memory accepted a non-zero field at 0x20");
         }
     }
+    auto throws = [](auto call) {
+        try { call(); } catch (const std::runtime_error&) { return true; }
+        return false;
+    };
+    for (const std::uint64_t size : {0x20ull, 0x28ull, 0x48ull}) {
+        setSize(size);
+        setFlags(0);
+        check(throws([&] { sceVideodecMapMemory(&ctrl, memory); }), "map memory did not throw on unmodelled decoder mapping");
+    }
 }
 
 }
