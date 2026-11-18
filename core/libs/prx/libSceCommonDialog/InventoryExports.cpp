@@ -4,6 +4,7 @@
 #include <cstdint>
 #include "SceTypes.hpp"
 #include "prx/libc/include/General.hpp"
+#include "prx/libSceSystemService/include/SystemService.hpp"
 #include <limits>
 #include <stdexcept>
 
@@ -24,13 +25,26 @@ bool HasClientImplementation(const void* client) {
     return implementation != 0;
 }
 
+bool ClientDestructionHasImplementation(const void* client) {
+    std::uint64_t implementation = 0;
+    const int savedErrno = errno;
+    const bool copied = client != nullptr &&
+        reinterpret_cast<std::uintptr_t>(client) <= std::numeric_limits<std::uintptr_t>::max() - 8 &&
+        GuestCopyIn_nid_no_patch(&implementation, static_cast<const std::byte*>(client) + 8, sizeof(implementation));
+    errno = savedErrno;
+    return copied && implementation != 0;
+}
+
 } // namespace
 
 extern "C" {
 
 int APS5_VABI _ZN3sce16CommonDialogUtil12getSelfAppIdEv() {
-    NotImplemented_nid_no_patch(__func__);
-    return 0;
+    LncAppStatus status{};
+    if (sceLncUtilGetAppStatus(&status) == 0) {
+        return status.appId;
+    }
+    return -1;
 }
 
 int APS5_VABI _ZN3sce16CommonDialogUtil6Client11closeModuleEv(void* self) {
@@ -59,18 +73,18 @@ int APS5_VABI _ZN3sce16CommonDialogUtil6Client15launchCmnDialogEv(void* self) {
 
 void APS5_VABI _ZN3sce16CommonDialogUtil6ClientD0Ev(void* self) {
     (void)self;
-    NotImplemented_nid_no_patch(__func__);
+    throw std::runtime_error("sce::CommonDialogUtil::Client deleting destructor: the console implementation traps (ud2)");
 }
 
 void APS5_VABI _ZN3sce16CommonDialogUtil6ClientD1Ev(void* self) {
-    if (!HasClientImplementation(self)) {
+    if (!ClientDestructionHasImplementation(self)) {
         return;
     }
     NotImplemented_nid_no_patch(__func__);
 }
 
 void APS5_VABI _ZN3sce16CommonDialogUtil6ClientD2Ev(void* self) {
-    if (!HasClientImplementation(self)) {
+    if (!ClientDestructionHasImplementation(self)) {
         return;
     }
     NotImplemented_nid_no_patch(__func__);
