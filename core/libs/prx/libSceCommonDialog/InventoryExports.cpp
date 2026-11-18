@@ -12,7 +12,7 @@ namespace {
 
 constexpr int kResult80B8000E = static_cast<int>(0x80B8000Eu);
 
-bool HasClientImplementation(const void* client) {
+bool HasClientImplementation(const void* client, bool throwOnUnreadable = true) {
     std::uint64_t implementation = 0;
     const int savedErrno = errno;
     const bool copied = client != nullptr &&
@@ -20,19 +20,12 @@ bool HasClientImplementation(const void* client) {
         GuestCopyIn_nid_no_patch(&implementation, static_cast<const std::byte*>(client) + 8, sizeof(implementation));
     errno = savedErrno;
     if (!copied) {
-        throw std::invalid_argument("CommonDialogUtil client: unreadable client");
+        if (throwOnUnreadable) {
+            throw std::invalid_argument("CommonDialogUtil client: unreadable client");
+        }
+        return false;
     }
     return implementation != 0;
-}
-
-bool ClientDestructionHasImplementation(const void* client) {
-    std::uint64_t implementation = 0;
-    const int savedErrno = errno;
-    const bool copied = client != nullptr &&
-        reinterpret_cast<std::uintptr_t>(client) <= std::numeric_limits<std::uintptr_t>::max() - 8 &&
-        GuestCopyIn_nid_no_patch(&implementation, static_cast<const std::byte*>(client) + 8, sizeof(implementation));
-    errno = savedErrno;
-    return copied && implementation != 0;
 }
 
 } // namespace
@@ -40,6 +33,7 @@ bool ClientDestructionHasImplementation(const void* client) {
 extern "C" {
 
 int APS5_VABI _ZN3sce16CommonDialogUtil12getSelfAppIdEv() {
+    static_assert(sizeof(LncAppStatus) == 0x40);
     LncAppStatus status{};
     if (sceLncUtilGetAppStatus(&status) == 0) {
         return status.appId;
@@ -77,14 +71,14 @@ void APS5_VABI _ZN3sce16CommonDialogUtil6ClientD0Ev(void* self) {
 }
 
 void APS5_VABI _ZN3sce16CommonDialogUtil6ClientD1Ev(void* self) {
-    if (!ClientDestructionHasImplementation(self)) {
+    if (!HasClientImplementation(self, false)) {
         return;
     }
     NotImplemented_nid_no_patch(__func__);
 }
 
 void APS5_VABI _ZN3sce16CommonDialogUtil6ClientD2Ev(void* self) {
-    if (!ClientDestructionHasImplementation(self)) {
+    if (!HasClientImplementation(self, false)) {
         return;
     }
     NotImplemented_nid_no_patch(__func__);
