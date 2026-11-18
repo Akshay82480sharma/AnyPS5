@@ -59,6 +59,16 @@ void TestNonNullExponent() {
     Require(storage.exponent == -7, "_FPow exponent unchanged");
     Require(storage.marker == 99, "_FPow marker unchanged");
 
+    storage.exponent = 5;
+    storage.marker = 42;
+    Require(_LPow_nid_postfix(7.0L, 1.0L, &storage.exponent) == 7.0L, "_LPow 7^1 with exponent pointer");
+    Require(storage.exponent == 5, "_LPow exponent unchanged when y is 1");
+    Require(storage.marker == 42, "_LPow marker unchanged when y is 1");
+
+    storage.exponent = 9;
+    Require(_LPow_nid_postfix(-3.0L, 1.0L, &storage.exponent) == -3.0L, "_LPow -3^1 with exponent pointer");
+    Require(storage.exponent == 9, "_LPow exponent unchanged when negative base y is 1");
+
     short lpowExp = 0;
     bool lpowThrew = false;
     try {

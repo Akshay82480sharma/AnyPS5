@@ -1051,6 +1051,133 @@ void CheckGroup5RemainingTimeGet(bool hasLibrary) {
     Require(NotImplementedCalls_nid_no_patch() > before, "Group 5 error paths reported");
 }
 
+void CheckGroup6Getloctxt(bool hasLibrary) {
+    auto run = [](const std::string& input, const char* table, std::size_t count = 0, bool buffered = true) {
+        InputStreambuf<char> sb{};
+        sb.Setup(input, buffered);
+        GuestLocale::InputIterator first = sb.Begin();
+        GuestLocale::InputIterator last = EndIter();
+        const int res = _ZSt10_GetloctxtIcSt19istreambuf_iteratorIcSt11char_traitsIcEEEiRT0_S5_mPKT__nid_postfix(&first, &last, count, table);
+        return std::pair<int, GuestLocale::InputIterator>{res, first};
+    };
+
+    const char* months = ":Jan:January:Feb:February";
+    {
+        auto [res, it] = run("Feb", months);
+        Require(res == 2, "Getloctxt Feb returns 2");
+        Require((it.words[1] & 0xffu) == 0, "Getloctxt Feb cache flag 0");
+    }
+    {
+        auto [res, it] = run("feb", months);
+        Require(res == 2, "Getloctxt feb returns 2");
+    }
+    {
+        auto [res, it] = run("FEB", months);
+        Require(res == 2, "Getloctxt FEB returns 2");
+    }
+    {
+        auto [res, it] = run("February", months);
+        Require(res == 3, "Getloctxt February returns 3");
+    }
+    {
+        auto [res, it] = run("Febx", months);
+        Require(res == 2, "Getloctxt Febx returns 2");
+        Require((it.words[1] & 0xffu) != 0, "Getloctxt Febx has cached char");
+        Require(static_cast<char>((it.words[1] >> 8) & 0xffu) == 'x', "Getloctxt Febx caches x");
+    }
+    {
+        auto [res, it] = run("Feb 3", months);
+        Require(res == 2, "Getloctxt Feb 3 returns 2");
+        Require((it.words[1] & 0xffu) != 0, "Getloctxt Feb 3 has cached char");
+        Require(static_cast<char>((it.words[1] >> 8) & 0xffu) == ' ', "Getloctxt Feb 3 caches space");
+    }
+    {
+        auto [res, it] = run("Febru", months);
+        Require(res == -1, "Getloctxt Febru at eof returns -1");
+    }
+    {
+        auto [res, it] = run("Janua", months);
+        Require(res == -1, "Getloctxt Janua at eof returns -1");
+    }
+    {
+        auto [res, it] = run("Ja", months);
+        Require(res == -1, "Getloctxt Ja at eof returns -1");
+    }
+    {
+        auto [res, it] = run("Xyz", months);
+        Require(res == -2, "Getloctxt Xyz returns -2");
+        Require((it.words[1] & 0xffu) != 0, "Getloctxt Xyz has cached char");
+        Require(static_cast<char>((it.words[1] >> 8) & 0xffu) == 'X', "Getloctxt Xyz caches X");
+    }
+    {
+        auto [res, it] = run("", months);
+        Require(res == -2, "Getloctxt empty input returns -2");
+        Require((it.words[1] & 0xffu) == 0, "Getloctxt empty input cache flag 0");
+    }
+    {
+        GuestLocale::InputIterator nullFirst{{0, 0}};
+        const int res = _ZSt10_GetloctxtIcSt19istreambuf_iteratorIcSt11char_traitsIcEEEiRT0_S5_mPKT__nid_postfix(&nullFirst, nullptr, 0, months);
+        Require(res == -2, "Getloctxt null streambuf returns -2");
+        Require(nullFirst.words[0] == 0 && nullFirst.words[1] == 0, "Getloctxt null streambuf unchanged");
+    }
+    {
+        auto [res, it] = run("mar", ":MAR:Apr");
+        Require(res == 0, "Getloctxt mar against :MAR:Apr returns 0");
+    }
+    {
+        auto [res, it] = run("pm", ":AM:PM");
+        Require(res == 1, "Getloctxt pm against :AM:PM returns 1");
+    }
+    {
+        auto [res, it] = run("p", ":AM:PM");
+        Require(res == -1, "Getloctxt p against :AM:PM returns -1");
+    }
+    {
+        const char* ab = ",a,ab,abc";
+        Require(run("a", ab).first == 0, "Getloctxt a against ,a,ab,abc returns 0");
+        Require(run("ab", ab).first == 1, "Getloctxt ab against ,a,ab,abc returns 1");
+        Require(run("abc", ab).first == 2, "Getloctxt abc against ,a,ab,abc returns 2");
+        auto [res, it] = run("abd", ab);
+        Require(res == 1, "Getloctxt abd against ,a,ab,abc returns 1");
+        Require((it.words[1] & 0xffu) != 0, "Getloctxt abd caches char");
+        Require(static_cast<char>((it.words[1] >> 8) & 0xffu) == 'd', "Getloctxt abd caches d");
+    }
+    {
+        Require(run("\xc9t\xe9", ":\xe9t\xe9:\xc9t\xe9").first == 1, "Getloctxt exact match high bytes");
+        Require(run("\xe9t\xe9", ":\xc9t\xe9").first == -2, "Getloctxt high bytes do not case-fold");
+    }
+    {
+        Require(run("anything", "").first == -2, "Getloctxt empty table returns -2");
+        Require(run("", ":").first == 0, "Getloctxt single separator table returns 0");
+        Require(run("Jan", "Jan:Feb").first == -2, "Getloctxt separator J returns -2");
+    }
+    {
+        InputStreambuf<char> sb{};
+        sb.Setup("test", true);
+        GuestLocale::InputIterator first = sb.Begin();
+        Require(Throws([&] {
+            _ZSt10_GetloctxtIcSt19istreambuf_iteratorIcSt11char_traitsIcEEEiRT0_S5_mPKT__nid_postfix(
+                &first, nullptr, std::numeric_limits<std::size_t>::max(), ":test");
+        }), "Getloctxt throws length_error when total count wraps");
+    }
+    {
+        Require(_ZSt10_GetloctxtIcSt19istreambuf_iteratorIcSt11char_traitsIcEEEiRT0_S5_mPKT__nid_postfix(nullptr, nullptr, 0, months) == -2, "Getloctxt null first returns -2");
+        InputStreambuf<char> sb{};
+        sb.Setup("test", true);
+        GuestLocale::InputIterator first = sb.Begin();
+        Require(_ZSt10_GetloctxtIcSt19istreambuf_iteratorIcSt11char_traitsIcEEEiRT0_S5_mPKT__nid_postfix(&first, nullptr, 0, nullptr) == -2, "Getloctxt null ptr returns -2");
+    }
+    if (hasLibrary) {
+        using GetloctxtFn = int (APS5_VABI*)(GuestLocale::InputIterator*, GuestLocale::InputIterator*, std::size_t, const char*);
+        const auto nidFn = ResolveExport<GetloctxtFn>("_ZSt10_GetloctxtIcSt19istreambuf_iteratorIcSt11char_traitsIcEEEiRT0_S5_mPKT__nid_postfix");
+        InputStreambuf<char> sb{};
+        sb.Setup("Feb", true);
+        GuestLocale::InputIterator first = sb.Begin();
+        GuestLocale::InputIterator last = EndIter();
+        Require(nidFn(&first, &last, 0, months) == 2, "Getloctxt export resolves and executes");
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1082,5 +1209,6 @@ int main(int argc, char** argv) {
     CheckGroup3Fields();
     CheckGroup4GetAndGetFmt();
     CheckGroup5RemainingTimeGet(hasLibrary);
+    CheckGroup6Getloctxt(hasLibrary);
     return 0;
 }

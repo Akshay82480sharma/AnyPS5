@@ -10,6 +10,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 extern "C" {
@@ -133,10 +136,25 @@ void Inc(GuestLocale::InputIterator& it) {
 }
 
 template<typename TChar>
-bool Equal(GuestLocale::InputIterator& first, GuestLocale::InputIterator& last) {
+bool Equal(GuestLocale::InputIterator& first, const GuestLocale::InputIterator* last) {
     if (!IteratorGot(first)) Peek<TChar>(first);
-    if (!IteratorGot(last)) Peek<TChar>(last);
-    return (IteratorBuffer(first) == nullptr) == (IteratorBuffer(last) == nullptr);
+    if (last != nullptr && !IteratorGot(*last)) Peek<TChar>(*const_cast<GuestLocale::InputIterator*>(last));
+    const bool firstEof = IteratorBuffer(first) == nullptr;
+    const bool lastEof = last == nullptr || IteratorBuffer(*last) == nullptr;
+    return firstEof == lastEof;
+}
+
+template<typename TChar>
+bool Equal(GuestLocale::InputIterator& first, GuestLocale::InputIterator& last) {
+    return Equal<TChar>(first, &last);
+}
+
+template<typename TChar>
+TChar ToAsciiLower(TChar ch) {
+    if (ch >= static_cast<TChar>('A') && ch <= static_cast<TChar>('Z')) {
+        return static_cast<TChar>(ch + (static_cast<TChar>('a') - static_cast<TChar>('A')));
+    }
+    return ch;
 }
 
 std::uint64_t EnsureFacetId(std::uint64_t& id) {
@@ -316,34 +334,60 @@ inline constexpr char kCharMonths[] = ":Jan:January:Feb:February:Mar:March:Apr:A
 inline constexpr char kCharAmPm[] = ":AM:am:PM:pm";
 
 template<typename TChar>
-int GetLocaleText(GuestLocale::InputIterator& first, GuestLocale::InputIterator& last, std::size_t numFields, const TChar* ptr) {
-    for (std::size_t off = 0; ptr[off] != TChar{}; ++off) {
-        if (ptr[off] == ptr[0]) ++numFields;
+int GetLocaleText(GuestLocale::InputIterator* first, const GuestLocale::InputIterator* last, std::size_t numFields, const TChar* ptr) {
+    if (first == nullptr || ptr == nullptr || *ptr == TChar{}) {
+        return -2;
     }
-    std::vector<std::size_t> skip(numFields, 0);
-    const GuestLocale::Facet* ctype = CtypeTraits<TChar>::FromGlobal();
+    const TChar sep = ptr[0];
+    std::size_t total = numFields;
+    for (std::size_t off = 0; ptr[off] != TChar{}; ++off) {
+        if (ptr[off] == sep) {
+            if (total == std::numeric_limits<std::size_t>::max()) {
+                throw std::length_error("string too long");
+            }
+            ++total;
+        }
+    }
+    if (total == 0) {
+        return -2;
+    }
 
+    std::string skip(total, '\0');
+    std::size_t col = 1;
     int ans = -2;
-    for (std::size_t col = 1;; ++col, Inc<TChar>(first), ans = -1) {
+
+    for (;; ++col, Inc<TChar>(*first), ans = -1) {
+        if (col > 127) {
+            break;
+        }
         bool prefix = false;
         std::size_t off = 0;
-        for (std::size_t field = 0; field < numFields; ++field) {
-            while (ptr[off] != TChar{} && ptr[off] != ptr[0]) ++off;
-            if (skip[field] != 0) {
-                off += skip[field];
-            } else if (ptr[off += col] == ptr[0] || ptr[off] == TChar{}) {
-                skip[field] = col;
+        for (std::size_t field = 0; field < total; ++field) {
+            while (ptr[off] != TChar{} && ptr[off] != sep) {
+                ++off;
+            }
+            if (skip[field] != '\0') {
+                off += static_cast<unsigned char>(skip[field]);
+            } else if (ptr[off += col] == sep || ptr[off] == TChar{}) {
+                skip[field] = static_cast<char>(col);
                 ans = static_cast<int>(field);
-            } else if (Equal<TChar>(first, last) ||
-                       CtypeTraits<TChar>::ToLower(ctype, ptr[off]) != CtypeTraits<TChar>::ToLower(ctype, Peek<TChar>(first))) {
-                skip[field] = col;
+            } else if (Equal<TChar>(*first, last) ||
+                       ToAsciiLower(ptr[off]) != ToAsciiLower(Peek<TChar>(*first))) {
+                skip[field] = static_cast<char>(col);
             } else {
                 prefix = true;
             }
         }
-        if (!prefix || Equal<TChar>(first, last)) break;
+        if (!prefix || Equal<TChar>(*first, last)) {
+            break;
+        }
     }
     return ans;
+}
+
+template<typename TChar>
+int GetLocaleText(GuestLocale::InputIterator& first, GuestLocale::InputIterator& last, std::size_t numFields, const TChar* ptr) {
+    return GetLocaleText<TChar>(&first, &last, numFields, ptr);
 }
 
 template<typename TChar>
@@ -914,6 +958,10 @@ GuestLocale::InputIterator APS5_VABI _ZNKSt8time_getIwSt19istreambuf_iteratorIwS
 
 GuestLocale::InputIterator APS5_VABI _ZNKSt8time_getIwSt19istreambuf_iteratorIwSt11char_traitsIwEEE7_GetfmtES3_S3_RSt8ios_baseRNSt5_IosbIiE8_IostateEP2tmPKc_nid_postfix(const GuestLocale::Facet* self, GuestLocale::InputIterator first, GuestLocale::InputIterator last, GuestLocale::IosBase* stream, std::int32_t* state, GuestTm* time, const char* fmtfirst) {
     return DoGetFmtImpl<std::uint16_t>(self, first, last, stream, state, time, fmtfirst, __func__);
+}
+
+int APS5_VABI _ZSt10_GetloctxtIcSt19istreambuf_iteratorIcSt11char_traitsIcEEEiRT0_S5_mPKT__nid_postfix(GuestLocale::InputIterator* first, GuestLocale::InputIterator* last, std::size_t numFields, const char* ptr) {
+    return GetLocaleText<char>(first, last, numFields, ptr);
 }
 
 }
