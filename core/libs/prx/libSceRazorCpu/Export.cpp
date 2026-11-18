@@ -173,8 +173,7 @@ int APS5_VABI sceRazorCpuInitializeGpuMarkerContext(const uint8_t* context) {
 }
 
 int APS5_VABI sceRazorCpuInitializeInternal(void) {
-    NotImplemented_nid_no_patch(__func__);
-    return 0;
+    throw std::runtime_error("sceRazorCpuInitializeInternal: capture paths unimplemented");
 }
 
 void APS5_VABI sceRazorCpuSetPopMarkerCallback(void* callback) {
