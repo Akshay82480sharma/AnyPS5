@@ -369,7 +369,7 @@ void* APS5_VABI mmap_np(void* address, std::size_t length, int protection, int f
             *__error_nid_postfix() = PosixEinval;
             return reinterpret_cast<void*>(-1);
         }
-        NotImplemented_nid_no_patch(__func__);
+        throw std::runtime_error("mmap_np: anonymous private mapping unverified");
     }
     std::string resolvedName;
     if (name != nullptr) {
@@ -392,7 +392,7 @@ void* APS5_VABI mmap_np(void* address, std::size_t length, int protection, int f
                                     length, protection, flags, descriptor, offset);
     if (mapped == reinterpret_cast<void*>(-1)) {
         if (*__error_nid_postfix() == PosixEnomem) {
-            NotImplemented_nid_no_patch(__func__);
+            throw std::runtime_error("mmap_np: out of memory unverified");
         }
         return mapped;
     }
@@ -412,7 +412,7 @@ int APS5_VABI msetname(void* address, std::size_t length, const char* name) {
 
 int APS5_VABI pthread_setschedparam_np(Pthread thread, int policy, const KernelSchedParam* param) {
     if (policy == 2) {
-        NotImplemented_nid_no_patch(__func__);
+        throw std::runtime_error("pthread_setschedparam_np: policy 2 unverified");
     }
     return pthread_setschedparam_nid_postfix(thread, policy, param);
 }
